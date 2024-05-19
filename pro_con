@@ -1,0 +1,593 @@
+import customtkinter as tk # type: ignore
+from tkinter import messagebox
+import webbrowser
+from PIL import Image, ImageTk
+
+def clear1():
+    result_entry.delete(0, "end")
+    entry.delete(0, "end")
+
+
+def exit11():
+    close = messagebox.askyesno('EXIT', 'Are you sure that you want to exit?')
+    if close:
+        root.destroy()
+
+
+# Function to save previous operations to a file
+def save_operations():
+    with open("previous_operations.txt", "w") as file:
+        for operation in previous_operations:
+            file.write(operation + "\n")
+
+
+# Function to load previous operations from a file
+def load_operations():
+    try:
+        with open("previous_operations.txt", "r") as file:
+            return [line.strip() for line in file.readlines()]
+    except FileNotFoundError:
+        return []
+
+
+# Load previous operations when the application starts
+previous_operations = load_operations()
+# قائمة لتخزين العمليات السابقة
+previous_operations = []
+
+
+def convert():
+    expression = entry.get()
+    source_base = int(from_var.get())
+    target_base = int(to_var.get())
+
+    try:
+        if any(op in expression for op in ['+', '-', '*', '/']):
+            # If the expression contains any arithmetic operators, evaluate it
+            result = evaluate_expression(expression, source_base)
+        else:
+            # Otherwise, treat the expression as a decimal number
+            result = decimal_value_from_base(source_base, expression)
+
+        # Convert result to the target base
+        if target_base == 10:
+            result_str = str(result)
+        elif target_base == 2:
+            result_str = decimal_to_binary(result)
+        elif target_base == 8:
+            result_str = decimal_to_octal(result)
+        elif target_base == 16:
+            result_str = decimal_to_hexadecimal(result)
+
+        result_var.set(f"Result: {result_str}")
+
+        # Add the current operation to the list of previous operations
+        operation = f"{expression} from base {source_base} to base {target_base} = {result_str}"
+        previous_operations.append(operation)
+        save_operations()  # Save operations to file
+
+    except ValueError as e:
+        messagebox.showerror("Error", f"Invalid input or expression: {e}")
+
+
+def evaluate_expression(expression, source_base):
+    # تقسيم التعبير بناءً على العمليات الحسابية
+    parts = []
+    current_part = ""
+    for char in expression:
+        if char in "+-*/":
+            parts.append(current_part.strip())
+            parts.append(char)
+            current_part = ""
+        else:
+            current_part += char
+    parts.append(current_part.strip())
+    print(current_part)
+    print(parts)
+    # تحويل كل جزء إلى القيمة العشرية إذا لم يكن عملية حسابية
+    decimal_results = [decimal_value_from_base(source_base, part) if part not in "+-*/" else part for part in parts]
+
+    # معالجة عمليات الضرب والقسمة أولاً
+    temp_results = [decimal_results[0]]
+    print(temp_results)
+    i = 1
+    while i < len(decimal_results):
+        operator = decimal_results[i]
+        if operator in '*/':
+            left_operand = temp_results.pop()
+            right_operand = decimal_results[i + 1]
+            if operator == '*':
+                temp_results.append(left_operand * right_operand)
+            elif operator == '/':
+                temp_results.append(left_operand / right_operand)
+            i += 2
+        else:
+            temp_results.append(operator)
+            temp_results.append(decimal_results[i + 1])
+            i += 2
+
+    # الآن قم بمعالجة عمليات الجمع والطرح
+    result = temp_results[0]
+    i = 1
+    while i < len(temp_results):
+        operator = temp_results[i]
+        if operator == '+':
+            result += temp_results[i + 1]
+        elif operator == '-':
+            result -= temp_results[i + 1]
+        i += 2
+
+    return result
+
+
+def ones_complement():
+    expression = entry.get()
+    source_base = int(from_var.get())
+
+    try:
+
+        if source_base == 2:
+            result = ones_complement_binary(expression)
+            result_var.set(f"1\'C: {result}")
+        else:
+            raise ValueError("One's complement is only applicable to binary numbers.")
+    except ValueError as e:
+        messagebox.showerror("Error", f"Invalid input: {e}")
+
+
+def twos_complement():
+    expression = entry.get()
+    source_base = int(from_var.get())
+
+    try:
+
+        if source_base == 2:
+            result = twos_complement_binary(expression)
+            result_var.set(f"2\'C: {result}")
+        else:
+            raise ValueError("Two's complement is only applicable to binary numbers.")
+    except ValueError as e:
+        messagebox.showerror("Error", f"Invalid input: {e}")
+
+
+def binary_to_decimal(binary_number):
+    if '.' in binary_number:
+        integer_part, fractional_part = binary_number.split('.')
+        if not all(char in '01' for char in integer_part) or not all(char in '01' for char in fractional_part):
+            raise ValueError("Invalid binary number")
+
+        integer_decimal = sum(int(digit) * (2 ** index) for index, digit in enumerate(integer_part[::-1]))
+        fractional_decimal = sum(int(digit) * (2 ** (-index - 1)) for index, digit in enumerate(fractional_part))
+        return integer_decimal + fractional_decimal
+    else:
+        if not all(char in '01' for char in binary_number):
+            raise ValueError("Invalid binary number")
+        else:
+            return sum(int(digit) * (2 ** index) for index, digit in enumerate(binary_number[::-1]))
+
+
+def octal_to_decimal(octal_number):
+    if '.' in octal_number:
+        integer_part, fractional_part = octal_number.split('.')
+        if not all(char in '01234567' for char in integer_part) or not all(
+                char in '01234567' for char in fractional_part):
+            raise ValueError("Invalid octal number")
+
+        integer_decimal = sum(int(digit) * (8 ** index) for index, digit in enumerate(integer_part[::-1]))
+        fractional_decimal = sum(int(digit) * (8 ** (-index - 1)) for index, digit in enumerate(fractional_part))
+        return integer_decimal + fractional_decimal
+    else:
+        if not all(char in '01234567' for char in octal_number):
+            raise ValueError("Invalid octal number")
+        else:
+            return sum(int(digit) * (8 ** index) for index, digit in enumerate(octal_number[::-1]))
+
+
+def hexadecimal_to_decimal(hexadecimal_number):
+    if '.' in hexadecimal_number:
+        integer_part, fractional_part = hexadecimal_number.split('.')
+        if not all(char in '0123456789ABCDEFabcdef' for char in integer_part) or not all(
+                char in '0123456789ABCDEFabcdef' for char in fractional_part):
+            raise ValueError("Invalid hexadecimal number")
+
+        integer_decimal = sum(int(digit, 16) * (16 ** index) for index, digit in enumerate(integer_part[::-1]))
+        fractional_decimal = sum(int(digit, 16) * (16 ** (-index - 1)) for index, digit in enumerate(fractional_part))
+        return integer_decimal + fractional_decimal
+    else:
+        if not all(char in '0123456789ABCDEFabcdef' for char in hexadecimal_number):
+            raise ValueError("Invalid hexadecimal number")
+        else:
+            return sum(int(digit, 16) * (16 ** index) for index, digit in enumerate(hexadecimal_number[::-1]))
+
+
+def decimal_to_binary(decimal_number):
+    integer_part = int(decimal_number)
+    fractional_part = decimal_number - integer_part if '.' in str(decimal_number) else 0
+    integer_binary = bin(integer_part)[2:]
+    fractional_binary = ''
+    if fractional_part != 0:
+        fractional_binary = '.'
+        max_precision = 10
+        while fractional_part > 0 and max_precision > 0:
+            fractional_part *= 2
+            if fractional_part >= 1:
+                fractional_part -= 1
+                fractional_binary += '1'
+            else:
+                fractional_binary += '0'
+            max_precision -= 1
+    return integer_binary + fractional_binary
+
+
+def decimal_to_octal(decimal_number):
+    integer_part = int(decimal_number)
+    fractional_part = decimal_number - integer_part if '.' in str(decimal_number) else 0
+    integer_octal = oct(integer_part)[2:]
+    fractional_octal = ''
+    if fractional_part != 0:
+        fractional_octal = '.'
+        max_precision = 10
+        while fractional_part > 0 and max_precision > 0:
+            fractional_part *= 8
+            digit = int(fractional_part)
+            fractional_octal += str(digit)
+            fractional_part -= digit
+            max_precision -= 1
+    return integer_octal + fractional_octal
+
+
+def decimal_to_hexadecimal(decimal_number):
+    integer_part = int(decimal_number)
+    fractional_part = decimal_number - integer_part if '.' in str(decimal_number) else 0
+    integer_hexadecimal = hex(integer_part)[2:].upper()
+    fractional_hexadecimal = ''
+    if fractional_part != 0:
+        fractional_hexadecimal = '.'
+        max_precision = 10
+        while fractional_part > 0 and max_precision > 0:
+            fractional_part *= 16
+            digit = int(fractional_part)
+            fractional_hexadecimal += hex(digit)[2:].upper()
+            fractional_part -= digit
+            max_precision -= 1
+    return integer_hexadecimal + fractional_hexadecimal
+
+
+
+def decimal_value_from_base(base, number):
+    if base == 2:
+        return binary_to_decimal(number)
+    elif base == 8:
+        return octal_to_decimal(number)
+    elif base == 16:
+        return hexadecimal_to_decimal(number)
+    else:
+        return float(number)
+
+
+def ones_complement_binary(binary_number):
+    if isinstance(binary_number, str) and all(digit in '01' for digit in binary_number):
+        return ''.join(['1' if bit == '0' else '0' for bit in binary_number])
+    else:
+        raise ValueError("Invalid binary number")
+
+
+def twos_complement_binary(binary_number):
+    if isinstance(binary_number, str) and all(digit in '01' for digit in binary_number):
+        ones_comp = ones_complement_binary(binary_number)
+        return bin(int(ones_comp, 2) + 1)[2:]
+    else:
+        raise ValueError("Invalid binary number")
+
+
+root = tk.CTk()
+
+root.configure(fg_color="#1f1f1f")
+root.title("Number System Converter")
+root.geometry("600x700")
+root.resizable(width=False, height=False)
+
+entry = tk.CTkEntry(root, width=560, height=60, fg_color="#242424", text_color="#1f6aa5", font=("Arial", 30),
+                    corner_radius=30)
+entry.pack(pady=10)
+
+to_var = tk.IntVar(value=10)  # Variable for to_frame radio buttons
+from_var = tk.IntVar(value=10)  # Variable for from_frame radio buttons
+theme_var = tk.IntVar(value=1)
+
+from_frame = tk.CTkFrame(root, fg_color="#1f1f1f")
+from_frame.pack()
+from_label = tk.CTkLabel(from_frame, text="From:", font=("Helvetica", 15), fg_color="#1f1f1f", text_color="#1f6aa4")
+from_label.pack(side="left")
+from_radio_decimal = tk.CTkRadioButton(from_frame, text="Decimal", variable=from_var, value=10, fg_color="#1f6aa4",
+                                       text_color="#1f6aa4", font=("Helvetica", 15))
+from_radio_decimal.pack(side="left", padx=10)
+from_radio_binary = tk.CTkRadioButton(from_frame, text="Binary", variable=from_var, value=2, fg_color="#1f6aa4",
+                                      text_color="#1f6aa4", font=("Helvetica", 15))
+from_radio_binary.pack(side="left", padx=10)
+from_radio_octal = tk.CTkRadioButton(from_frame, text="Octal", variable=from_var, value=8, fg_color="#1f6aa4",
+                                     text_color="#1f6aa4", font=("Helvetica", 15))
+from_radio_octal.pack(side="left", padx=10)
+from_radio_hexadecimal = tk.CTkRadioButton(from_frame, text="Hexadecimal", variable=from_var, value=16,
+                                           fg_color="#1f6aa4", text_color="#1f6aa4", font=("Helvetica", 15))
+from_radio_hexadecimal.pack(side="left", padx=10)
+
+to_frame = tk.CTkFrame(root, fg_color="#1f1f1f")
+to_frame.pack()
+to_label = tk.CTkLabel(to_frame, text="To:", font=("Helvetica", 15), fg_color="#1f1f1f", text_color="#1f6aa4")
+to_label.pack(side="left")
+to_radio_decimal = tk.CTkRadioButton(to_frame, text="Decimal", variable=to_var, value=10, fg_color="#1f6aa4",
+                                     text_color="#1f6aa4", font=("Helvetica", 15))
+to_radio_decimal.pack(side="left", padx=10)
+to_radio_binary = tk.CTkRadioButton(to_frame, text="Binary", variable=to_var, value=2, fg_color="#1f6aa4",
+                                    text_color="#1f6aa4", font=("Helvetica", 15))
+to_radio_binary.pack(side="left", padx=10)
+to_radio_octal = tk.CTkRadioButton(to_frame, text="Octal", variable=to_var, value=8, fg_color="#1f6aa4",
+                                   text_color="#1f6aa4", font=("Helvetica", 15))
+to_radio_octal.pack(side="left", padx=10)
+to_radio_hexadecimal = tk.CTkRadioButton(to_frame, text="Hexadecimal", variable=to_var, value=16, fg_color="#1f6aa4",
+                                         text_color="#1f6aa4", font=("Helvetica", 15))
+to_radio_hexadecimal.pack(side="left", padx=10)
+
+result_var = tk.StringVar()
+
+result_entry = tk.CTkEntry(root, fg_color="#242424", width=550, height=60, text_color="#1f6aa5", textvariable=result_var,
+                           font=("Helvetica", 30), corner_radius=30)
+result_entry.pack(pady=10)
+
+exit_button = tk.CTkButton(root, text='Exit', fg_color='#1f6aa4', width=550, height=40, command=exit11,
+                           corner_radius=10, font=('Arial', 18))
+exit_button.pack(side="bottom", pady=13)
+
+clear_button = tk.CTkButton(root, text='Clear', fg_color='#1f6aa4', width=550, height=40, command=clear1,
+                            corner_radius=10, font=('Arial', 18))
+clear_button.pack(side="bottom", pady=13)
+
+convert_button = tk.CTkButton(root, text="Convert", fg_color="#1f6aa4", width=550, height=40, command=convert,
+                              corner_radius=10, font=('Arial', 18))
+convert_button.pack(side="bottom", pady=13)
+
+twos_complement_button = tk.CTkButton(root, text="Twos-complement", width=550, height=40, fg_color="#1f6aa4",
+                                      command=twos_complement, corner_radius=10, font=('Arial', 18))
+twos_complement_button.pack(side="bottom", pady=13)
+
+ones_complement_button = tk.CTkButton(root, text="Ones-complement", width=550, height=40, fg_color="#1f6aa4",
+                                      command=ones_complement, corner_radius=10, font=('Arial', 18))
+ones_complement_button.pack(side="bottom", pady=13)
+
+
+def open_settings_window():
+    settings_window = tk.CTkToplevel(root)
+    settings_window.title("Settings")
+    settings_window.geometry("360x500")
+    settings_window.configure(fg_color=root.cget("fg_color"))
+    settings_window.resizable(width=False, height=False)
+
+    def contact_us():
+        import webbrowser
+        webbrowser.open('https://api.whatsapp.com/send?phone=201017980478')
+
+    contact_button = tk.CTkButton(settings_window, text="Contact with us on WhatsApp", command=contact_us,
+                                  fg_color="#1f6aa4", text_color="black", font=('Arial', 18), corner_radius=10, width=400, height=40)
+    contact_button.pack(side="bottom", padx=10 ,pady=10)
+
+    help_text = """
+    Welcome to the Number System Converter app!
+
+    To use the app:
+    1. Enter the number you want to convert in the entry field.
+    2. Select the base of the entered number using the "From" options.
+    3. Select the target base you want to convert to using the "To" options.
+    4. Click the "Convert" button to see the result.
+    5. You can clear the input fields by clicking the "Clear" button.
+    6. If you encounter any errors or need assistance, click the "Help" button for guidance.
+
+    For more information and tutorials on number systems, click the "Learn More" button to access external resources.
+
+    Enjoy converting numbers!
+    """
+
+    def show_help():
+        messagebox.showinfo("Help", help_text)
+
+    def learn_more():
+        import webbrowser
+        webbrowser.open("https://en.wikipedia.org/wiki/Numeral_system")
+    def git_hub():
+        import webbrowser
+        webbrowser.open("https://en.wikipedia.org/wiki/Numeral_system")
+
+    help_button = tk.CTkButton(settings_window, text="Help", fg_color="#1f6aa4", text_color="black", font=('Arial', 18),
+                               corner_radius=10, command=show_help, width=400, height=40)
+    help_button.pack(side="bottom", padx=10,pady=10)
+
+    learn_more_button = tk.CTkButton(settings_window, text="Learn More", fg_color="#1f6aa4", text_color="black",
+                                     font=('Arial', 18), corner_radius=10, command=learn_more, width=400, height=40)
+    learn_more_button.pack(side="bottom", padx=10,pady=10)
+
+    def show_last_10_operations():
+        global operations_window
+        operations_window = tk.CTkToplevel(settings_window)
+        operations_window.title("Last 10 Operations")
+        operations_window.geometry("360x400")
+        operations_window.configure(fg_color="#1f1f1f")
+        operations_window.resizable(width=False, height=False)
+        previous_operations = load_operations()
+        operations_text = ""
+        if len(previous_operations) > 0:
+            operations_text = "\n\n".join(previous_operations[-10:])
+        else:
+            operations_text = "No previous operations"
+        global operations_display
+        operations_display = tk.CTkTextbox(operations_window, font=("Arial", 15), fg_color="#1f1f1f",
+                                           text_color="#1f6aa4", width=400, height=300)
+        operations_display.insert(tk.END, operations_text)
+        operations_display.pack(padx=20, pady=10)
+
+        close_button = tk.CTkButton(operations_window, text="Close", fg_color="#1f6aa4", text_color="black",
+                                    font=('Arial', 14), corner_radius=10, command=operations_window.destroy, width=400, height=40)
+        close_button.pack(side="bottom", pady=10)
+
+    show_operations_button = tk.CTkButton(settings_window, text="Show Last 10 Operations", fg_color="#1f6aa4",
+                                          text_color="black", font=('Arial', 18), corner_radius=10,
+                                          command=show_last_10_operations, width=400, height=40)
+    show_operations_button.pack(side="bottom", padx=10,pady=10)
+
+    def About_US():
+        global history_window
+        history_window = tk.CTkToplevel(settings_window)
+        history_window.title("History")
+        history_window.geometry("360x400")
+        history_window.configure(fg_color="#1f1f1f")
+
+        team_label = tk.CTkLabel(history_window, text="Logs Teams", font=("Arial", 20), fg_color="#1f1f1f",
+                                 text_color="#FFFFFF")
+        team_label.pack(pady=10)
+
+        team_text = tk.CTkLabel(history_window, text="The heads of AI invasion", font=("Arial", 12), fg_color="#1f1f1f",
+                                text_color="#FFFFFF")
+        team_text.pack(pady=10)
+
+        image_path = r"C:\Users\Techno\Desktop\Videos\cam19May2024020544.png"
+        team_image = Image.open(image_path)
+        team_image = team_image.resize((460, 400))
+        team_image_tk = ImageTk.PhotoImage(team_image)
+        team_image_label = tk.CTkLabel(history_window, image=team_image_tk, fg_color="#1f1f1f")
+        team_image_label.image = team_image_tk  # Keep a reference to the image to prevent garbage collection
+        
+        team_image_label.pack(pady=3 , padx=3)
+
+
+    about_us_button = tk.CTkButton(settings_window, text="About Us", fg_color="#1f6aa4", text_color="black",
+                                   font=('Arial', 18), corner_radius=10, command=About_US, width=400, height=40)
+    about_us_button.pack(side="bottom", padx=10,pady=10)
+    
+    def toggle_light_mode():
+        global text1 
+        text1= "Dark Mode"
+        current_bg = root.cget("fg_color")  # Use fg_color from customtkinter
+        if current_bg == "#1f1f1f":
+            root.configure(fg_color="#FFFFFF")
+            from_label.configure(fg_color="#FFFFFF", text_color="#283747")
+            to_label.configure(fg_color="#FFFFFF", text_color="#283747")
+            from_frame.configure(fg_color="#FFFFFF")
+            to_frame.configure(fg_color="#FFFFFF")
+            to_radio_octal.configure( text_color="#283747", fg_color="#1f6aa4")
+            to_radio_decimal.configure( text_color="#283747", fg_color="#1f6aa4")
+            to_radio_binary.configure( text_color="#283747", fg_color="#1f6aa4")
+            to_radio_hexadecimal.configure( text_color="#283747", fg_color="#1f6aa4")
+            from_radio_octal.configure( text_color="#283747", fg_color="#1f6aa4")
+            from_radio_decimal.configure( text_color="#283747", fg_color="#1f6aa4")
+            from_radio_binary.configure( text_color="#283747", fg_color="#1f6aa4")
+            from_radio_hexadecimal.configure( text_color="#283747", fg_color="#1f6aa4")
+            settings_window.configure(fg_color="#FFFFFF")
+            history_window.configure(fg_color="#FFFFFF")
+            operations_window.configure(fg_color="#FFFFFF")
+            text1 ="Dark Mode"
+            light_mode_button.configure(text=text1)
+        else:
+            root.configure(fg_color="#1f1f1f")
+            from_label.configure(fg_color="#1f1f1f", text_color="#1f6aa4")
+            to_label.configure(fg_color="#1f1f1f", text_color="#1f6aa4")
+            from_frame.configure(fg_color="#1f1f1f")
+            to_frame.configure(fg_color="#1f1f1f")
+            to_radio_octal.configure(fg_color="#1f1f1f", text_color="#1f6aa4")
+            to_radio_decimal.configure(fg_color="#1f1f1f", text_color="#1f6aa4")
+            to_radio_binary.configure(fg_color="#1f1f1f", text_color="#1f6aa4")
+            to_radio_hexadecimal.configure(fg_color="#1f1f1f", text_color="#1f6aa4")
+            from_radio_octal.configure(fg_color="#1f1f1f", text_color="#1f6aa4")
+            from_radio_decimal.configure(fg_color="#1f1f1f", text_color="#1f6aa4")
+            from_radio_binary.configure(fg_color="#1f1f1f", text_color="#1f6aa4")
+            from_radio_hexadecimal.configure(fg_color="#1f1f1f", text_color="#1f6aa4")
+            settings_window.configure(fg_color="#1f1f1f")
+            history_window.configure(fg_color="#1f1f1f")
+            operations_window.configure(fg_color="#1f1f1f")
+            text1 = "Light Mode"
+            light_mode_button.configure(text=text1)
+
+  
+    def set_theme2():
+        # Remove buttons from Theme 1 (to_frame and from_frame)
+        for widget in to_frame.winfo_children():
+            widget.destroy()
+        for widget in from_frame.winfo_children():
+            widget.destroy()
+
+         # إنشاء الأزرار لـ Theme 2 (to_frame و from_frame)
+        global to_radio_decimal, to_radio_binary, to_radio_octal, to_radio_hexadecimal
+        global from_radio_decimal, from_radio_binary, from_radio_octal, from_radio_hexadecimal
+
+        to_radio_decimal = tk.CTkRadioButton(to_frame, text="Decimal", variable=to_var, value=10, font=("Helvetica", 15))
+        to_radio_binary = tk.CTkRadioButton(to_frame, text="Binary", variable=to_var, value=2, font=("Helvetica", 15))
+        to_radio_octal = tk.CTkRadioButton(to_frame, text="Octal", variable=to_var, value=8, font=("Helvetica", 15))
+        to_radio_hexadecimal = tk.CTkRadioButton(to_frame, text="Hexadecimal", variable=to_var, value=16, font=("Helvetica", 15))
+
+        from_label = tk.CTkLabel(to_frame, text="From:", font=("Helvetica", 15), fg_color="#1f1f1f", text_color="#1f6aa4")
+        to_label = tk.CTkLabel(from_frame, text="TO:", font=("Helvetica", 15), fg_color="#1f1f1f", text_color="#1f6aa4")
+
+        from_radio_decimal = tk.CTkRadioButton(from_frame, text="Decimal", variable=from_var, value=10, font=("Helvetica", 15))
+        from_radio_binary = tk.CTkRadioButton(from_frame, text="Binary", variable=from_var, value=2, width=20, font=("Helvetica", 15))
+        from_radio_octal = tk.CTkRadioButton(from_frame, text="Octal", variable=from_var, value=8, font=("Helvetica", 15))
+        from_radio_hexadecimal = tk.CTkRadioButton(from_frame, text="Hexadecimal", variable=from_var, value=16, font=("Helvetica", 15))
+
+        # تنظيم الأزرار داخل الإطارات
+        from_label.pack(side="left")
+        to_label.pack(side="left")
+        to_radio_decimal.pack(side="left", padx=10)
+        to_radio_binary.pack(side="left", padx=10)
+        to_radio_octal.pack(side="left", padx=10)
+        to_radio_hexadecimal.pack(side="left", padx=10)
+
+        from_radio_decimal.pack(side="left", padx=10)
+        from_radio_binary.pack(side="left", padx=10)
+        from_radio_octal.pack(side="left", padx=10)
+        from_radio_hexadecimal.pack(side="left", padx=10)
+  
+
+    def set_theme1():
+        # Remove buttons from Theme 2 (to_frame and from_frame)
+        for widget in to_frame.winfo_children():
+            widget.destroy()
+        for widget in from_frame.winfo_children():
+            widget.destroy()
+
+        # Create buttons for Theme 1 (to_frame and from_frame)
+        global to_dropdown1, from_dropdown1
+        
+        to_dropdown1 = tk.CTkOptionMenu(to_frame, variable=to_var, values=["2", "8", "10", "16"], width=550, height=40,corner_radius=20)
+        from_dropdown1 = tk.CTkOptionMenu(from_frame, variable=from_var, values=["2", "8", "10", "16"], width=550, height=40,corner_radius=20)
+
+        from_dropdown1.pack(pady=5)
+        to_dropdown1.pack(pady=15)
+       
+
+    def toggle_theme():
+        if theme_var.get() == 1:
+            set_theme1()
+        elif theme_var.get() == 2:
+            set_theme2()
+
+
+    
+    light_mode_button = tk.CTkButton(settings_window, text="Dark mode", fg_color="#1f6aa4", text_color="black",
+                                      font=('Arial', 18), corner_radius=10, command=toggle_light_mode, width=550, height=40)
+    light_mode_button.pack(side="bottom", padx=10, pady=10)
+
+
+    # tk.CTkLabel(settings_window, text="Select Theme:").pack(side=tk.LEFT)
+    tk.CTkRadioButton(settings_window, text="Theme 1", variable=theme_var, value=1,text_color="#1f6aa4").place(x=30 , y =30)
+    tk.CTkRadioButton(settings_window, text="Theme 2", variable=theme_var, value=2,text_color="#1f6aa4").place(x=230 , y =30)
+    switch_theme_button = tk.CTkButton(settings_window, text="Switch Theme : ", fg_color="#1f6aa4", text_color="black",
+                                      font=('Arial', 18), corner_radius=10, command=toggle_theme, width=550, height=40)
+    switch_theme_button.pack(side="bottom", pady=10 ,padx = 10)
+
+ 
+
+settings_button = tk.CTkButton(root, text="Settings", fg_color="#1f6aa4", command=open_settings_window,
+                               corner_radius=10, font=('Arial', 18), width=550, height=40)
+settings_button.pack(side="bottom", pady=10)
+
+
+
+root.mainloop()
+
